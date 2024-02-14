@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Noviflix Client</string>
+    <string name="element_text" />
+    <string name="fab_content_description" />
+</resources>

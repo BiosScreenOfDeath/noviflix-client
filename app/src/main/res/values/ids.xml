@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="movieView" type="id" />
+    <item name="titleView" type="id" />
+    <item name="textView" type="id" />
+</resources>
