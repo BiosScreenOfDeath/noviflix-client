@@ -281,32 +281,35 @@ fun NoviflixClient(modifier: Modifier){
     Surface(modifier = Modifier,
         color = MaterialTheme.colorScheme.background
     ) {
-        val movies = try {
-            runBlocking {
-                withContext(Dispatchers.IO){
-                    get("http://10.0.2.2:8085/api/v1/movies", null)
-                }
-            }
-        } catch (e: NetworkOnMainThreadException) {
-            listOf<Movie>()//e.toString()
-        }
-        MovieLoop(movies = movies)
+        MovieLoop()
     }
 }
 
 @Preview(showBackground = true, widthDp = 320)
 @Composable
 private fun MovieLoop(
-    modifier: Modifier = Modifier,
-    movies: List<Movie> = listOf<Movie>()
+    modifier: Modifier = Modifier
+    /*movies: List<Movie> = listOf<Movie>()*/
 ) {
+
+    val movies = try {
+        runBlocking {
+            withContext(Dispatchers.IO){
+                get("http://10.0.2.2:8085/api/v1/movies", null)
+            }
+        }
+    } catch (e: NetworkOnMainThreadException) {
+        listOf<Movie>()//e.toString()
+    }
+
     println("In MovieLoop: $movies")
+
+//    movies = listOf<Movie>()
 
     val showCreatedMovie = remember{ mutableStateOf(false) }
     val showNextMovie = remember { mutableStateOf(false) }
     val showSearchedMovie = remember { mutableStateOf(false) }
     val searchText = remember { mutableStateOf("") }
-
 
     val nextMovie = remember{ mutableStateOf<Movie>(Movie(-1,"","","")) }
     val newMovie = remember{ mutableStateOf<Movie>(Movie(-1,"","","")) }
