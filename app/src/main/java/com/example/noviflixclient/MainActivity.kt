@@ -44,6 +44,25 @@ import okhttp3.Response
 
 // add the HTTP calls to some "noviflix" class in the final cleanup
 
+fun randomMovie(): Movie {
+    val movieSources = listOf<Movie>(
+        Movie(0, "gun","john", "it's like wow"),
+        Movie(1, "sky","cena", "don't ask"),
+        Movie(2, "night","no", "yes it is"),
+        Movie(3, "monster","not you", "just"),
+        Movie(4, "4","alan-e", "amazing"),
+        Movie(5, "duck","you-da", "literally me"),
+        Movie(6, "laser","des-k", "just... no"),
+        Movie(7, "the man","co-fi", "hm"),
+        Movie(8, "go","c-up", "it's cool"),
+    )
+    return Movie(
+        movieSources.random().id,
+        movieSources.random().title+" "+movieSources.random().title,
+        movieSources.random().director,
+        movieSources.random().plot)
+}
+
 suspend fun get(url: String, id: Int?): List<Movie> {
 
     val fullURL = if(id != null){
@@ -59,20 +78,27 @@ suspend fun get(url: String, id: Int?): List<Movie> {
             .header("Accept", "application/json")
             .build()
 
-    var getResponse: List<Movie> = listOf<Movie>()
+    var getResponse: List<Movie> = listOf<Movie>(
+        Movie(-1,"","","")
+    )
 
     withContext(Dispatchers.IO){
         try {
             val response = client.newCall(request).execute()
             val gson = Gson()
             val jsonData = response.body?.string()
-            println(jsonData?.get(0).toString() == "{")
-            getResponse = if(jsonData?.get(0).toString() == "{"){
-                println(jsonData)
-                listOf(gson.fromJson<Movie?>(jsonData, Movie::class.java))
-            }else{
-                gson.fromJson<Array<Movie>?>(jsonData, Array<Movie>::class.java)
-                    .toList<Movie>()
+            val responseCode = response.code
+            if(responseCode == 200){
+                println("GET successful: $responseCode")
+                getResponse = if( jsonData?.get(0).toString() == "{"){
+                    //println(jsonData)
+                    listOf(gson.fromJson<Movie?>(jsonData, Movie::class.java))
+                }else{
+                    gson.fromJson<Array<Movie>?>(jsonData, Array<Movie>::class.java)
+                        .toList<Movie>()
+                }
+            } else {
+                println("GET unsuccessful: $responseCode")
             }
         } catch (e: Exception) {
             println("Σ' ΕΠΙΑΣΑ: $e")
@@ -91,36 +117,28 @@ suspend fun delete(url: String) {
             .delete()
             .build()
 
-    var responseCode = -1
-
     withContext(Dispatchers.IO){
         try {
             val response: Response = client.newCall(request).execute()
-            responseCode = response.code
+            val responseCode = response.code
+            if(responseCode === 204){
+                println("Deletion was successful: $responseCode")
+            } else {
+                println("Houston, deletion was unsuccessful: $responseCode")
+            }
         } catch (e: Exception) {
             println("Σ' ΕΠΙΑΣΑ: $e")
         }
-    }
-
-    if(responseCode === 204){
-        println("Deletion was successful: $responseCode")
-    } else {
-        println("Houston, deletion was unsuccessful: $responseCode")
     }
 }
 
 suspend fun post(url: String): Movie{
     val client = OkHttpClient()
 
-    val titleList = listOf<String>("gun","sky","night","monster","4","duck","laser","the man","go")
-    val directorList = listOf<String>("john","cena","no","not you","alan-e")
-    val plotList = listOf<String>("it's like wow", "don't ask", "yes it is","just")
-
-    val body = ("{" +
-            "\"title\":\"${titleList.random()} ${titleList.random()}\"," +
-            "\"director\":\"${directorList.random()}\"," +
-            "\"plot\":\"${plotList.random()}\"" +
-            "}").toRequestBody("application/json".toMediaTypeOrNull())
+    val gson = Gson()
+    val directedMovie = randomMovie()
+    val body = gson.toJson(directedMovie, Movie::class.java)
+        .toRequestBody("application/json".toMediaTypeOrNull())
 
     val request =
         Request.Builder()
@@ -134,37 +152,30 @@ suspend fun post(url: String): Movie{
 
     withContext(Dispatchers.IO){
         try {
-            val gson = Gson()
             val response: Response = client.newCall(request).execute()
             responseCode = response.code
-            val jsonData = response.body?.string()
-            postMovie = gson.fromJson<Movie?>(jsonData, Movie::class.java)
+            if(responseCode === 201){
+                println("Addition was successful: $responseCode")
+                val jsonData = response.body?.string()
+                postMovie = gson.fromJson<Movie?>(jsonData, Movie::class.java)
+            } else {
+                println("Houston, addition was unsuccessful: $responseCode")
+            }
         } catch (e: Exception) {
             println("Σ' ΕΠΙΑΣΑ: $e")
         }
     }
 
-    if(responseCode === 201){
-        println("Addition was successful: $responseCode")
-    } else {
-        println("Houston, addition was unsuccessful: $responseCode")
-    }
     return postMovie
 }
 
 suspend fun put(url: String, id: Int): Movie{
     val client = OkHttpClient()
 
-    val titleList = listOf<String>("gun","sky","night","monster","4","duck","laser","the man","go")
-    val directorList = listOf<String>("john","cena","no","not you","alan-e")
-    val plotList = listOf<String>("it's like wow", "don't ask", "yes it is","just")
-
-    val body = ("{" +
-            "\"id\":\"${id}\","+
-            "\"title\":\"${titleList.random()} ${titleList.random()}\"," +
-            "\"director\":\"${directorList.random()}\"," +
-            "\"plot\":\"${plotList.random()}\"" +
-            "}").toRequestBody("application/json".toMediaTypeOrNull())
+    val gson = Gson()
+    val directedMovie = randomMovie()
+    val body = gson.toJson(directedMovie, Movie::class.java)
+        .toRequestBody("application/json".toMediaTypeOrNull())
 
     val request =
         Request.Builder()
@@ -173,26 +184,24 @@ suspend fun put(url: String, id: Int): Movie{
             .put(body)
             .build()
 
-    var responseCode = -1
     var putMovie = Movie(id,"[REDACTED]","[REDACTED]","[REDACTED]")
 
     withContext(Dispatchers.IO){
         try {
-            val gson = Gson()
             val response: Response = client.newCall(request).execute()
-            responseCode = response.code
-            val jsonData = response.body?.string()
-            putMovie = gson.fromJson<Movie?>(jsonData, Movie::class.java)
+            val responseCode = response.code
+            if(responseCode === 200){
+                println("Update was successful: $responseCode")
+                val jsonData = response.body?.string()
+                putMovie = gson.fromJson<Movie?>(jsonData, Movie::class.java)
+            } else {
+                println("Houston, update was unsuccessful: $responseCode")
+            }
         } catch (e: Exception) {
             println("Σ' ΕΠΙΑΣΑ: $e")
         }
     }
 
-    if(responseCode === 200){
-        println("Update was successful: $responseCode")
-    } else {
-        println("Houston, update was unsuccessful: $responseCode")
-    }
     return putMovie
 }
 
@@ -208,11 +217,15 @@ suspend fun whatsnext(url: String): Movie{
     withContext(Dispatchers.IO){
         try {
             val response = client.newCall(request).execute()
+            val responseCode = response.code
             val gson = Gson()
-            val jsonData = response.body?.string()
-            println(jsonData?.get(0).toString() == "{")
-            println(jsonData)
-            nextMovie = gson.fromJson<Movie?>(jsonData, Movie::class.java)
+            if(responseCode == 200){
+                println("Received upcoming movie!")
+                val jsonData = response.body?.string()
+                nextMovie = gson.fromJson<Movie?>(jsonData, Movie::class.java)
+            } else {
+                println("Failed to receive upcoming movie.")
+            }
         } catch (e: Exception) {
             println("Σ' ΕΠΙΑΣΑ: $e")
         }
@@ -267,9 +280,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             NoviflixClientTheme {
-                // A surface container using the 'background' color from the theme
-                // Greeting("Android")
-
                 NoviflixClient(modifier = Modifier.fillMaxSize())
             }
         }
@@ -289,7 +299,6 @@ fun NoviflixClient(modifier: Modifier){
 @Composable
 private fun MovieLoop(
     modifier: Modifier = Modifier
-    /*movies: List<Movie> = listOf<Movie>()*/
 ) {
 
     val movies = try {
@@ -301,10 +310,6 @@ private fun MovieLoop(
     } catch (e: NetworkOnMainThreadException) {
         listOf<Movie>()//e.toString()
     }
-
-    println("In MovieLoop: $movies")
-
-//    movies = listOf<Movie>()
 
     val showCreatedMovie = remember{ mutableStateOf(false) }
     val showNextMovie = remember { mutableStateOf(false) }
@@ -525,20 +530,3 @@ private fun MovieLoop(
         }
     }
 }
-
-//@Composable
-//fun Greeting(name: String, modifier: Modifier = Modifier) {
-//
-//    Text(
-//            text = "Hello $name!",
-//            modifier = modifier
-//    )
-//}
-//
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview() {
-//    NoviflixClientTheme {
-//        Greeting("Android")
-//    }
-//}
