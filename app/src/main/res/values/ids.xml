@@ -3,4 +3,5 @@
     <item name="movieView" type="id" />
     <item name="titleView" type="id" />
     <item name="textView" type="id" />
+    <item name="recycler_view" type="id" />
 </resources>

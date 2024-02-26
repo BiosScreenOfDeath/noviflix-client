@@ -2,36 +2,10 @@ package com.example.noviflixclient
 
 import android.os.Bundle
 import android.os.NetworkOnMainThreadException
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
-import com.example.noviflixclient.ui.theme.NoviflixClientTheme
+import android.view.View
+import android.widget.Button
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -233,300 +207,70 @@ suspend fun whatsnext(url: String): Movie{
     return nextMovie
 }
 
-@Composable
-fun AlertDialogWrapper(
-    onDismissRequest: () -> Unit,
-    onConfirmation: () -> Unit,
-    dialogTitle: String,
-    dialogText: String,
-    icon: ImageVector,
-) {
-    AlertDialog(
-        icon = {
-            Icon(icon, contentDescription = "Example Icon")
-        },
-        title = {
-            Text(text = dialogTitle)
-        },
-        text = {
-            Text(text = dialogText)
-        },
-        onDismissRequest = {
-            onDismissRequest()
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirmation()
+class MainActivity : AppCompatActivity() {
+
+    private fun MovieLoop() {
+
+        val movies = try {
+            runBlocking {
+                withContext(Dispatchers.IO){
+                    get("http://10.0.2.2:8085/api/v1/movies", null)
                 }
-            ) {
-                Text("Confirm")
             }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = {
-                    onDismissRequest()
+        } catch (e: NetworkOnMainThreadException) {
+            listOf<Movie>()//e.toString()
+        }
+
+        val movieAdapter = MovieAdapter(movies)
+
+        val recyclerView: RecyclerView = findViewById(R.id.recycler_view)
+        recyclerView.adapter = movieAdapter
+
+        mainActivityButtons(movieAdapter)
+    }
+
+    private fun mainActivityButtons(movieAdapter: MovieAdapter){
+        val directMovieButton = findViewById<Button>(R.id.directMovieButton)
+        val whatsNextButton = findViewById<Button>(R.id.whatsNextButton)
+
+        directMovieButton.text = "Direct a movie"
+        whatsNextButton.text = "What's next?"
+
+        directMovieButton.setOnClickListener{
+            try {
+                runBlocking {
+                    withContext(Dispatchers.IO) {
+                        post("http://10.0.2.2:8085/api/v1/movies/")
+                    }
                 }
-            ) {
-                Text("Dismiss")
+                movieAdapter.loadMovies()
+            }catch (e: Exception){
+                println("Error on directMovieButton's click event:"+e.printStackTrace())
             }
         }
-    )
-}
 
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            NoviflixClientTheme {
-                NoviflixClient(modifier = Modifier.fillMaxSize())
+        whatsNextButton.setOnClickListener{
+            try {
+                runBlocking {
+                    withContext(Dispatchers.IO) {
+                        whatsnext("http://10.0.2.2:8085/api/v1/movies/whatsnext")
+                    }
+                }
+                movieAdapter.loadMovies()
+            }catch (e: Exception){
+                println("Error on whatsNextButton's click event:"+e.printStackTrace())
             }
         }
     }
-}
 
-@Composable
-fun NoviflixClient(modifier: Modifier){
-    Surface(modifier = Modifier,
-        color = MaterialTheme.colorScheme.background
-    ) {
+    fun noviflixClient(){
         MovieLoop()
     }
-}
 
-@Preview(showBackground = true, widthDp = 320)
-@Composable
-private fun MovieLoop(
-    modifier: Modifier = Modifier
-) {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-    val movies = try {
-        runBlocking {
-            withContext(Dispatchers.IO){
-                get("http://10.0.2.2:8085/api/v1/movies", null)
-            }
-        }
-    } catch (e: NetworkOnMainThreadException) {
-        listOf<Movie>()//e.toString()
-    }
-
-    val showCreatedMovie = remember{ mutableStateOf(false) }
-    val showNextMovie = remember { mutableStateOf(false) }
-    val showSearchedMovie = remember { mutableStateOf(false) }
-    val searchText = remember { mutableStateOf("") }
-
-    val nextMovie = remember{ mutableStateOf<Movie>(Movie(-1,"","","")) }
-    val newMovie = remember{ mutableStateOf<Movie>(Movie(-1,"","","")) }
-    val updatedMovie = remember{ mutableStateOf<Movie>(Movie(-1,"","","")) }
-    val searchMovie = remember{ mutableStateOf<Movie>(Movie(-1,"","","")) }
-
-    Column (
-        modifier = Modifier
-    ) {
-
-        Row (
-            modifier = Modifier
-        ){
-            ElevatedButton(onClick = {
-                newMovie.value = try {
-                    runBlocking {
-                        withContext(Dispatchers.IO) {
-                            println("Running post!")
-                            post("http://10.0.2.2:8085/api/v1/movies/")
-                        }
-                    }
-                } catch (e: Exception) {
-                    println(e.printStackTrace())
-                    Movie(-1, "", "", "")
-                }
-                showCreatedMovie.value = !showCreatedMovie.value
-                println("New movie! ${newMovie.value.title}")
-            }) {
-                Text("Direct a movie!")
-            }
-
-            ElevatedButton(
-                onClick = {
-                    nextMovie.value = try{
-                        runBlocking {
-                            withContext(Dispatchers.IO){
-                                whatsnext("http://10.0.2.2:8085/api/v1/movies/whatsnext")
-                            }
-                        }
-                    }catch (e: Exception){
-                        println(e.printStackTrace())
-                        Movie(-1, "", "", "")
-                    }
-                    showNextMovie.value = !showNextMovie.value
-                    println("Next movie! ${nextMovie.value.title}")
-                },
-                modifier = modifier.fillMaxWidth()
-                ) {
-                Text("What's next?")
-            }
-
-            if(showNextMovie.value){
-                AlertDialogWrapper(
-                    onDismissRequest = { showNextMovie.value = false },
-                    onConfirmation = { showNextMovie.value = false },
-                    dialogTitle = "Coming up",
-                    dialogText = "Stay tuned for '${nextMovie.value.title}', where '${nextMovie.value.plot}'!",
-                    icon = Icons.Default.Info
-                )
-            }
-
-            if(showCreatedMovie.value){
-                println("New movie! ${newMovie.value.title}")
-                AlertDialogWrapper(
-                    onDismissRequest = { showCreatedMovie.value = false },
-                    onConfirmation = { showCreatedMovie.value = false },
-                    dialogTitle = "Movie created",
-                    dialogText = "Directed the movie: ${newMovie.value.title}!",
-                    icon = Icons.Default.Info
-                )
-            }
-        }
-
-        Row (
-            modifier = modifier.align(Alignment.CenterHorizontally)
-        ) {
-            OutlinedTextField(
-                value = searchText.value,
-                onValueChange = { newValue -> searchText.value = newValue },
-                label = { Text("ID Search") }
-            )
-            ElevatedButton(
-                onClick = {
-                    searchMovie.value = try{
-                        runBlocking {
-                            withContext(Dispatchers.IO){
-                                get("http://10.0.2.2:8085/api/v1/movies", searchText.value.toInt())[0]
-                            }
-                        }
-                    } catch (e: Exception){
-                        println(e.printStackTrace())
-                        searchMovie.value
-                    }
-                    showSearchedMovie.value = !showSearchedMovie.value
-                },
-                modifier = modifier.align(Alignment.CenterVertically),
-                colors = ButtonDefaults.elevatedButtonColors(
-                    containerColor = Color.Green
-                )
-            ) {
-                Text("Submit ID")
-            }
-
-            if(showSearchedMovie.value){
-                AlertDialogWrapper(
-                    onDismissRequest = { showSearchedMovie.value = false },
-                    onConfirmation = { showSearchedMovie.value = false },
-                    dialogTitle = "Coming up",
-                    dialogText = "Movie: \"${searchMovie.value.title}\"" + "\n" +
-                        "Director: \"${searchMovie.value.director}\"" + "\n" +
-                        "Plot: \"${searchMovie.value.plot}\"",
-                    icon = Icons.Default.Info
-                )
-            }
-        }
-
-        LazyColumn(modifier = modifier.padding(vertical = 4.dp)) {
-            items(
-                items = movies,
-                ) {  movie ->
-
-                val expandButton = remember { mutableStateOf(false) }
-                val extraPadding = if(expandButton.value) 48.dp else 0.dp
-                val deleteButton = remember { mutableStateOf(false) }
-                val deleteAlertDialog = remember { mutableStateOf(false) }
-                val updateAlertDialog = remember { mutableStateOf(false) }
-
-                Surface(
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp, horizontal = 8.dp)
-                ) {
-                    if(!deleteButton.value){
-                        Column (
-                            modifier = Modifier
-                                .padding(12.dp)
-                        ) {
-                            Row {
-                                Column (modifier = Modifier
-                                    .weight(1f)
-                                    .padding(bottom = extraPadding)) {
-                                    Text(
-                                        text = "Movie: ${movie.title}\n" +
-                                                //"Director: ${movie.director}\n" +
-                                                "Plot: ${movie.plot}",
-                                    )
-                                }
-                                ElevatedButton(onClick = {
-                                    expandButton.value = !expandButton.value
-                                }) {
-                                    Text(
-                                        if (expandButton.value){
-                                            "Less"
-                                        } else {
-                                            "More"
-                                        }
-                                    )
-                                }
-                            }
-                            if(expandButton.value){
-                                ElevatedButton(onClick = {
-                                    deleteButton.value = !deleteButton.value
-                                    try {
-                                        runBlocking {
-                                            withContext(Dispatchers.IO) {
-                                                delete("http://10.0.2.2:8085/api/v1/movies/${movie.id}")
-                                            }
-                                        }
-                                    } catch (e: Exception){ println(e.printStackTrace()) }
-                                    deleteAlertDialog.value = !deleteAlertDialog.value
-                                }) {
-                                    Text("Delete movie")
-                                }
-                                ElevatedButton(onClick = {
-                                    updatedMovie.value = try {
-                                        runBlocking {
-                                            withContext(Dispatchers.IO) {
-                                                put("http://10.0.2.2:8085/api/v1/movies/${movie.id}", movie.id)
-                                            }
-                                        }
-                                    } catch (e: Exception){
-                                        println(e.printStackTrace())
-                                        Movie(-1,"","","")
-                                    }
-                                    updateAlertDialog.value = !updateAlertDialog.value
-                                }) {
-                                    Text("Update movie")
-                                }
-                            }
-                        }
-                    }
-                    if(deleteAlertDialog.value){
-                        AlertDialogWrapper(
-                            onDismissRequest = { deleteAlertDialog.value = false },
-                            onConfirmation = { deleteAlertDialog.value = false },
-                            dialogTitle = "Movie deleted",
-                            dialogText = "Movie ${movie.title} was deleted!",
-                            icon = Icons.Default.Info
-                        )
-                    }
-                    if(updateAlertDialog.value){
-                        AlertDialogWrapper(
-                            onDismissRequest = { updateAlertDialog.value = false },
-                            onConfirmation = { updateAlertDialog.value = false },
-                            dialogTitle = "Movie updated",
-                            dialogText = "This movie was lame, we're remaking it as '${updatedMovie.value.title}'!",
-                            icon = Icons.Default.Info
-                        )
-                    }
-                }
-            }
-        }
+        noviflixClient()
     }
 }
