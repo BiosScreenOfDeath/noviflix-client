@@ -11,18 +11,27 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="end"
-        android:text="dir"></Button>
+        android:text="dir" />
 
     <Button
         android:id="@+id/whatsNextButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="end"
-        android:text="nex"></Button>
+        android:text="nex" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
+
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/searchMovie"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#66E599"
+            android:textColor="#90D54C"
+            >
+        </androidx.appcompat.widget.SearchView>
 
     </LinearLayout>
 

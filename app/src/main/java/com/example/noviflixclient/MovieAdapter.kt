@@ -15,6 +15,10 @@ import kotlinx.coroutines.withContext
 class MovieAdapter(private var movieList: List<Movie>) :
     RecyclerView.Adapter<MovieAdapter.ViewHolder>() {
 
+    private var updateListener: View.OnClickListener? = null
+    private var deleteListener: View.OnClickListener? = null
+    var moviePosition: Int = -1
+
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view){
         val textView: TextView
         val moreButton: Button
@@ -41,7 +45,7 @@ class MovieAdapter(private var movieList: List<Movie>) :
     }
 
     fun loadMovies(){
-        movieList = try {
+        this.movieList = try {
             runBlocking {
                 withContext(Dispatchers.IO) {
                     get("http://10.0.2.2:8085/api/v1/movies", null)
@@ -54,12 +58,17 @@ class MovieAdapter(private var movieList: List<Movie>) :
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.textView.text = "Movie: " + movieList[position].title
+        holder.textView.text =
+            "Movie: " + movieList[position].title + "(#${movieList[position].id})"
         holder.moreButton.text = "More"
         holder.updateButton.text = "Update movie"
         holder.deleteButton.text = "Delete movie"
 
         holder.moreButton.setOnClickListener{
+
+            this.moviePosition = holder.bindingAdapterPosition
+            println("ID: "+this.moviePosition)
+
             if(holder.updateButton.visibility == View.VISIBLE
                 && holder.deleteButton.visibility == View.VISIBLE){
                 holder.updateButton.visibility = View.INVISIBLE
@@ -71,36 +80,21 @@ class MovieAdapter(private var movieList: List<Movie>) :
             }
         }
 
-        holder.updateButton.setOnClickListener{
-            try {
-                runBlocking {
-                    withContext(Dispatchers.IO) {
-                        put("http://10.0.2.2:8085/api/v1/movies/${movieList[position].id}",
-                            movieList[position].id)
-                    }
-                }
-                loadMovies()
-            }catch (e: Exception){
-                println("Error on updateButton's click event:"+e.printStackTrace())
-            }
-        }
+        holder.updateButton.setOnClickListener(updateListener)
 
-        holder.deleteButton.setOnClickListener{
-            try {
-                runBlocking {
-                    withContext(Dispatchers.IO) {
-                        delete("http://10.0.2.2:8085/api/v1/movies/${movieList[position].id}")
-                    }
-                }
-                holder.movieEntryView.removeView(holder.cardView)
-                loadMovies()
-            }catch (e: Exception){
-                println("Error on deleteButton's click event: "+e.printStackTrace())
-            }
-        }
+        holder.deleteButton.setOnClickListener(deleteListener)
+
     }
 
     override fun getItemCount(): Int {
         return movieList.size
+    }
+
+    fun setOnUpdateClickListener(listener: View.OnClickListener){
+        this.updateListener = listener
+    }
+
+    fun setOnDeleteClickListener(listener: View.OnClickListener){
+        this.deleteListener = listener
     }
 }

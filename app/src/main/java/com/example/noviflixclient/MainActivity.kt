@@ -1,10 +1,13 @@
 package com.example.noviflixclient
 
+import android.app.Dialog
 import android.os.Bundle
 import android.os.NetworkOnMainThreadException
 import android.view.View
 import android.widget.Button
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -121,13 +124,12 @@ suspend fun post(url: String): Movie{
             .post(body)
             .build()
 
-    var responseCode = -1
     var postMovie = Movie(-1,"","","")
 
     withContext(Dispatchers.IO){
         try {
             val response: Response = client.newCall(request).execute()
-            responseCode = response.code
+            val responseCode = if (response.isSuccessful) response.code else -1
             if(responseCode === 201){
                 println("Addition was successful: $responseCode")
                 val jsonData = response.body?.string()
@@ -144,6 +146,9 @@ suspend fun post(url: String): Movie{
 }
 
 suspend fun put(url: String, id: Int): Movie{
+
+    if(id == -1) return Movie(-1,"X","X","X")
+
     val client = OkHttpClient()
 
     val gson = Gson()
@@ -207,6 +212,24 @@ suspend fun whatsnext(url: String): Movie{
     return nextMovie
 }
 
+class DialogFragmentWrapper(private val message: String) : DialogFragment() {
+    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+        return activity?.let {
+            // Use the Builder class for convenient dialog construction.
+            val builder = AlertDialog.Builder(it)
+            builder.setMessage(message)
+                .setPositiveButton("OK") { dialog, id ->
+                    // Add after-dialog stuff.
+                }
+                .setNegativeButton("Cancel") { dialog, id ->
+                    // User cancelled the dialog.
+                }
+            // Create the AlertDialog object and return it.
+            builder.create()
+        } ?: throw IllegalStateException("Activity cannot be null")
+    }
+}
+
 class MainActivity : AppCompatActivity() {
 
     private fun MovieLoop() {
@@ -226,41 +249,149 @@ class MainActivity : AppCompatActivity() {
         val recyclerView: RecyclerView = findViewById(R.id.recycler_view)
         recyclerView.adapter = movieAdapter
 
-        mainActivityButtons(movieAdapter)
+        mainActivityButtons(movies, movieAdapter)
+
     }
 
-    private fun mainActivityButtons(movieAdapter: MovieAdapter){
+    private fun showDeleteAlert(){
+        DialogFragmentWrapper(
+            "Movie was deleted!")
+            .show(supportFragmentManager, "Delete Movie")
+    }
+
+    private fun showUpdateAlert(movie: Movie){
+        DialogFragmentWrapper(
+            "Updated movie! New title: "+movie.title)
+            .show(supportFragmentManager, "Updated Movie")
+    }
+
+    private fun mainActivityButtons(movies: List<Movie>, movieAdapter: MovieAdapter){
         val directMovieButton = findViewById<Button>(R.id.directMovieButton)
         val whatsNextButton = findViewById<Button>(R.id.whatsNextButton)
+        val searchMovie = findViewById<androidx.appcompat.widget.SearchView>(R.id.searchMovie)
 
         directMovieButton.text = "Direct a movie"
         whatsNextButton.text = "What's next?"
 
         directMovieButton.setOnClickListener{
-            try {
+            val directedMovie: Movie = try {
                 runBlocking {
                     withContext(Dispatchers.IO) {
                         post("http://10.0.2.2:8085/api/v1/movies/")
                     }
                 }
-                movieAdapter.loadMovies()
             }catch (e: Exception){
                 println("Error on directMovieButton's click event:"+e.printStackTrace())
+                Movie(-1,"","","")
+            }
+            if(directedMovie.id > -1){
+                DialogFragmentWrapper(
+                    "Directed movie! Title: "+directedMovie.title)
+                    .show(supportFragmentManager, "Movie Directed")
+                movieAdapter.loadMovies()
+                movieAdapter.notifyDataSetChanged()
             }
         }
 
         whatsNextButton.setOnClickListener{
-            try {
+            val comingUpMovie: Movie = try {
                 runBlocking {
                     withContext(Dispatchers.IO) {
                         whatsnext("http://10.0.2.2:8085/api/v1/movies/whatsnext")
                     }
                 }
-                movieAdapter.loadMovies()
             }catch (e: Exception){
                 println("Error on whatsNextButton's click event:"+e.printStackTrace())
+                Movie(-1,"","","")
+            }
+            if(comingUpMovie.id > -1){
+                DialogFragmentWrapper(
+                    "Coming up is... \n" +
+                    "Title: "+comingUpMovie.title+"\n"+
+                    "Plot: "+comingUpMovie.plot+"\n"+
+                    "Director: "+comingUpMovie.director+" ~!")
+                    .show(supportFragmentManager, "Coming Up")
             }
         }
+
+        searchMovie.setOnQueryTextListener(object:
+            androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextChange(newText: String?): Boolean {
+                println("Text in search:$newText")
+                return false
+            }
+
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                println("Submitted: ${query}")
+                val receivedMovie: Movie = try {
+                        if (query != null){
+                            runBlocking {
+                                withContext(Dispatchers.IO){
+                                    get("http://10.0.2.2:8085/api/v1/movies", query.toInt())[0]
+                                }
+                            }
+                        } else {
+                            Movie(-1,"","","")
+                        }
+                    } catch (e: Exception){
+                        println(e.printStackTrace())
+                        Movie(-1,"","","")
+                    }
+                if(receivedMovie.id > -1){
+                    DialogFragmentWrapper(
+                        "Movie info:\n" +
+                            "Title: "+receivedMovie.title+"\n"+
+                            "Plot: "+receivedMovie.plot+"\n"+
+                            "Director: "+receivedMovie.director+" ~!")
+                        .show(supportFragmentManager, "Found Movie")
+                }
+                println("Received movie: ${receivedMovie.title}")
+                return false
+            }
+        })
+
+        movieAdapter.setOnUpdateClickListener(View.OnClickListener {view ->
+
+            println("UPD: "+movies[movieAdapter.moviePosition].id)
+
+            val updatedMovie: Movie = try {
+                runBlocking {
+                    withContext(Dispatchers.IO) {
+                        put("http://10.0.2.2:8085/api/v1/movies/${movies[movieAdapter.moviePosition].id}",
+                            movies[movieAdapter.moviePosition].id)
+                    }
+                }
+            }catch (e: Exception){
+                println("Error on updateButton's click event:"+e.printStackTrace())
+                Movie(-1,"","","")
+            }
+            if(updatedMovie.id > -1){
+                println("updated movie! id: "+movies[movieAdapter.moviePosition].id)
+                showUpdateAlert(updatedMovie)
+                movieAdapter.loadMovies()
+                movieAdapter.notifyDataSetChanged()
+            }
+        })
+
+        movieAdapter.setOnDeleteClickListener(View.OnClickListener {
+            println("DEL: "+movies[movieAdapter.moviePosition].id)
+            try {
+                val movieToDelete = movies[movieAdapter.moviePosition].id
+                runBlocking {
+                    withContext(Dispatchers.IO) {
+                        delete("http://10.0.2.2:8085/api/v1/movies/${movieToDelete}")
+                    }
+                }
+                println("removed movie!")
+                // query the adapter to remove the view of the respective movie id
+            }catch (e: Exception){
+                println("Error on deleteButton's click event: "+e.printStackTrace())
+            }
+            showDeleteAlert()
+            movieAdapter.loadMovies()
+            movieAdapter.notifyDataSetChanged()
+        })
+
     }
 
     fun noviflixClient(){
