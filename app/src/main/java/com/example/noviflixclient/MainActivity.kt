@@ -8,6 +8,8 @@ import android.widget.Button
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.FragmentActivity
+import androidx.fragment.app.FragmentManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -230,6 +232,24 @@ class DialogFragmentWrapper(private val message: String) : DialogFragment() {
     }
 }
 
+fun showDeleteAlert(sfm: FragmentManager){
+    if (sfm != null) {
+        println("showDeleteAlert")
+        DialogFragmentWrapper(
+            "Movie was deleted!")
+            .show(sfm, "Delete Movie")
+    } else { println("showDeleteAlert - sfm is null") }
+}
+
+fun showUpdateAlert(movie: Movie, sfm: FragmentManager){
+    if (sfm != null) {
+        println("showUpdateAlert")
+        DialogFragmentWrapper(
+            "Updated movie! New title: "+movie.title)
+            .show(sfm, "Updated Movie")
+    } else { println("showUpdateAlert - sfm is null") }
+}
+
 class MainActivity : AppCompatActivity() {
 
     private fun MovieLoop() {
@@ -244,25 +264,13 @@ class MainActivity : AppCompatActivity() {
             listOf<Movie>()//e.toString()
         }
 
-        val movieAdapter = MovieAdapter(movies)
+        val movieAdapter = MovieAdapter(this, movies)
 
         val recyclerView: RecyclerView = findViewById(R.id.recycler_view)
         recyclerView.adapter = movieAdapter
 
         mainActivityButtons(movies, movieAdapter)
 
-    }
-
-    private fun showDeleteAlert(){
-        DialogFragmentWrapper(
-            "Movie was deleted!")
-            .show(supportFragmentManager, "Delete Movie")
-    }
-
-    private fun showUpdateAlert(movie: Movie){
-        DialogFragmentWrapper(
-            "Updated movie! New title: "+movie.title)
-            .show(supportFragmentManager, "Updated Movie")
     }
 
     private fun mainActivityButtons(movies: List<Movie>, movieAdapter: MovieAdapter){
@@ -349,49 +357,6 @@ class MainActivity : AppCompatActivity() {
                 return false
             }
         })
-
-        movieAdapter.setOnUpdateClickListener(View.OnClickListener {view ->
-
-            println("UPD: "+movies[movieAdapter.moviePosition].id)
-
-            val updatedMovie: Movie = try {
-                runBlocking {
-                    withContext(Dispatchers.IO) {
-                        put("http://10.0.2.2:8085/api/v1/movies/${movies[movieAdapter.moviePosition].id}",
-                            movies[movieAdapter.moviePosition].id)
-                    }
-                }
-            }catch (e: Exception){
-                println("Error on updateButton's click event:"+e.printStackTrace())
-                Movie(-1,"","","")
-            }
-            if(updatedMovie.id > -1){
-                println("updated movie! id: "+movies[movieAdapter.moviePosition].id)
-                showUpdateAlert(updatedMovie)
-                movieAdapter.loadMovies()
-                movieAdapter.notifyDataSetChanged()
-            }
-        })
-
-        movieAdapter.setOnDeleteClickListener(View.OnClickListener {
-            println("DEL: "+movies[movieAdapter.moviePosition].id)
-            try {
-                val movieToDelete = movies[movieAdapter.moviePosition].id
-                runBlocking {
-                    withContext(Dispatchers.IO) {
-                        delete("http://10.0.2.2:8085/api/v1/movies/${movieToDelete}")
-                    }
-                }
-                println("removed movie!")
-                // query the adapter to remove the view of the respective movie id
-            }catch (e: Exception){
-                println("Error on deleteButton's click event: "+e.printStackTrace())
-            }
-            showDeleteAlert()
-            movieAdapter.loadMovies()
-            movieAdapter.notifyDataSetChanged()
-        })
-
     }
 
     fun noviflixClient(){
